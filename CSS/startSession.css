@@ -1,0 +1,89 @@
+*{
+    margin: 0;
+    border: 0;
+    padding: 0;
+}
+
+body{
+    background-color: rgb(243, 240, 237);
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: Helvetica;
+}
+
+main{
+    display: flex;
+    flex-direction: column;
+    gap: 50px;
+    text-align: center;
+    align-items: center;
+}
+
+h1{
+    color: rgb(41, 41, 100);
+    font-size: 40px;
+}
+
+#text{
+    font-size: 25px;
+}
+
+button{
+    background-color: rgb(52, 140, 199);
+    color: white;
+    font-size: 18px;
+    width: 100px;
+    height: 40px;
+    border-radius: 8px;
+    position: relative;
+    overflow: hidden;
+
+}
+
+button p{
+    position: absolute;         
+    top: 50%;                    
+    left: 50%;                  
+    transform: translate(-50%, -50%); 
+    z-index: 2;  
+}
+
+#branco{
+    background-color: rgb(42, 85, 165);
+    width: 100%;
+    height: 100%;
+    position: relative;
+    transform: translateY(-100%);
+}
+
+button:hover #branco{
+    animation: up ease 0.4s forwards;
+}
+
+button:hover{
+    cursor: pointer;
+}
+
+button:not(:hover) #branco{
+    animation: down ease 0.4s backwards;
+}
+
+@keyframes up{
+    to{
+        transform: translateY(0);
+    }
+    from{
+        transform: translateY(100%);
+    }
+}
+
+@keyframes down{
+    to{
+        transform: translateY(100%);
+    }
+    from{
+        transform: translateY(0);
+    }
+}
