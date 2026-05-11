@@ -1,88 +1,103 @@
 <?php
-
+error_reporting(0);
+ini_set('display_errors', 0);
 session_start();
 include('user_app.php');
 
+if(isset($_GET['email'])){
+    checkEmailExists();
+    exit;
+}
+
 if(existNameEmailAndPass()){
-    verifycharacters();
     cleanData();
+    validateStringEmail();
+    sanitizeEmail();
     matchPass();
+    $senhaOriginal = trim($_POST['senha']);
+    hashPassword();
     insertCredentialsIntoDB();
-    recoverUserData();
-    verifySession();
+    recoverUserData($senhaOriginal);
     startSession();
 }
 
-function existNameEmailAndPass(){
-    return isset($_POST['nome']) && isset($_POST['email']) && isset($_POST['senha']) && isset($_POST['senhaConfirm']);
-}
+function checkEmailExists(){
+    global $mysqli;
+    $email = filter_var($_GET['email'], FILTER_SANITIZE_EMAIL);
 
-function verifycharacters(){
-    if(nameIsNull() || emailIsNull() || passIsNull() || passConfirmIsNull()){
-        exit;
+    if(!filter_var($email, FILTER_VALIDATE_EMAIL)){
+        echo json_encode(["exists" => false]);
+        return;
     }
+
+    $stmt = $mysqli->prepare("SELECT id FROM users WHERE email = ?");
+    $stmt->bind_param("s", $email);
+    $stmt->execute();
+    $stmt->store_result();
+    echo json_encode(["exists" => $stmt->num_rows > 0]);
+    $stmt->close();
 }
 
-function nameIsNull(){
-    return empty($_POST['nome']);
+function existNameEmailAndPass(){
+    return isset($_POST['nome'], $_POST['email'], $_POST['senha'], $_POST['senhaConfirm']);
 }
-
-function emailIsNull(){
-    return empty($_POST['email']);
-}
-
-function passIsNull(){
-    return empty($_POST['senha']);
-}
-
-function passConfirmIsNull(){
-    return empty($_POST['senhaConfirm']);
-}
-
 
 function cleanData(){
     global $mysqli, $email, $senha, $nome, $senhaConfirm;
-    $nome = $mysqli->real_escape_string($_POST['nome']);
-    $email = $mysqli->real_escape_string($_POST['email']);
-    $senha = $mysqli->real_escape_string($_POST['senha']);
-    $senhaConfirm = $mysqli->real_escape_string($_POST['senhaConfirm']);
+    $nome         = $mysqli->real_escape_string(trim($_POST['nome']));
+    $email        = $mysqli->real_escape_string(trim($_POST['email']));
+    $senha        = trim($_POST['senha']);
+    $senhaConfirm = trim($_POST['senhaConfirm']);
+
+    if(empty($nome) || empty($email) || empty($senha) || empty($senhaConfirm)) exit;
+}
+
+function validateStringEmail(){
+    global $email;
+    if(!filter_var($email, FILTER_VALIDATE_EMAIL)) exit;
+}
+
+function sanitizeEmail(){
+    global $email;
+    $email = filter_var($email, FILTER_SANITIZE_EMAIL);
 }
 
 function matchPass(){
     global $senha, $senhaConfirm;
-    if($senha != $senhaConfirm){
-        exit;
-    }
+    if($senha !== $senhaConfirm) exit;
+}
+
+function hashPassword(){
+    global $senha;
+    $senha = password_hash($senha, PASSWORD_BCRYPT);
 }
 
 function insertCredentialsIntoDB(){
-    global $mysqli, $email, $senha, $nome, $sqlQuery;
-
-    $sqlCode = "INSERT INTO users (nome,email,senha) VALUES ('$nome','$email','$senha')";
-    $mysqli->query($sqlCode);
+    global $mysqli, $email, $senha, $nome;
+    $stmt = $mysqli->prepare("INSERT INTO users (nome, email, senha) VALUES (?, ?, ?)");
+    $stmt->bind_param("sss", $nome, $email, $senha);
+    $stmt->execute();
+    $stmt->close();
 }
 
-function recoverUserData(){
-    global $mysqli, $sqlQuery, $usuario, $email, $senha;
+function recoverUserData($senhaOriginal){
+    global $mysqli, $email, $usuario;
+    $stmt = $mysqli->prepare("SELECT * FROM users WHERE email = ?");
+    $stmt->bind_param("s", $email);
+    $stmt->execute();
+    $usuario = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
 
-    $sqlQuery = $mysqli->query("SELECT * FROM users WHERE email='$email' AND senha='$senha'");
-    $usuario = $sqlQuery->fetch_assoc();
-}
-
-function verifySession(){
-    if(!isset($_SESSION)){
-        session_start();
-    }
+    if(!$usuario || !password_verify($senhaOriginal, $usuario['senha'])) exit;
 }
 
 function startSession(){
     global $usuario;
-    $_SESSION['id'] = $usuario['id'];
+    $_SESSION['id']   = $usuario['id'];
     $_SESSION['nome'] = $usuario['nome'];
     header("Location: logIn.php");
     exit;
 }
-
 ?>
 
 <!DOCTYPE html>
@@ -114,6 +129,9 @@ function startSession(){
         </div>
         <div id="buttonElinkCreateAccount">
             <button type="submit" id="btnSend">Cadastrar</button>
+        </div>
+        <div id="message">
+            <p id="messageP"></p>
         </div>
     </form>
     <section>

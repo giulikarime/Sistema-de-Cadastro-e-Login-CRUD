@@ -1,77 +1,58 @@
 <?php
-
+session_start();
 include('user_app.php');
 
 if(existEmailAndPass()){
-    verifyChacters();
+    verifyCharacters();
     cleanData();
-    conectMySQL();
-    countUsersInDB();
-    verifySession();
-    startSession();
+    $usuario = findUserByEmail();
+    verifyCredentials($usuario);
+    startSession($usuario);
 }
 
 function existEmailAndPass(){
     return isset($_POST['email']) && isset($_POST['senha']);
 }
 
-function verifyChacters(){
-    if(charactersIsNull()){
-        exit;
-    }                                                                                                                                                                            
+function verifyCharacters(){
+    if(empty($_POST['email']) || empty($_POST['senha'])){
+        returnError("Preencha todos os campos.");
+    }
 }
-
-function charactersIsNull(){
-    return emailNull() || passNull();
-}
-
-function emailNull(){
-    return strlen($_POST['email']) == 0;
-}
-
-function passNull(){
-    return strlen($_POST['senha']) == 0;
-}
-
 
 function cleanData(){
     global $mysqli, $email, $senha;
-    $email = $mysqli->real_escape_string($_POST['email']);
-    $senha = $mysqli->real_escape_string($_POST['senha']);
+    $email = $mysqli->real_escape_string(trim($_POST['email']));
+    $senha = trim($_POST['senha']);
 }
 
-function conectMySQL(){
-    global $mysqli, $email, $senha, $sqlQuery;
-    $sqlCode = "SELECT * FROM users WHERE email = '$email' AND senha = '$senha'";
-    $sqlQuery = $mysqli->query($sqlCode) or die("Falha na execução: " . $mysqli->error);
+function findUserByEmail(){
+    global $mysqli, $email;
+
+    $stmt = $mysqli->prepare("SELECT * FROM users WHERE email = ?");
+    $stmt->bind_param("s", $email);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    return $result->fetch_assoc();
 }
 
-function countUsersInDB(){
-    global $sqlQuery;
-    $userExistsWithCredentials = $sqlQuery->num_rows;
-    if($userExistsWithCredentials == 1){
-        recoverUserData();
-    } else {
-        exit;
+function verifyCredentials($usuario){
+    global $senha;
+
+    if(!$usuario || !password_verify($senha, $usuario['senha'])){
+        returnError("Email ou senha incorretos.");
     }
 }
 
-function recoverUserData(){
-    global $sqlQuery, $usuario;
-    $usuario = $sqlQuery->fetch_assoc();
-}
-
-function verifySession(){
-    if(!isset($_SESSION)){
-        session_start();
-    }
-}
-
-function startSession(){
-    global $usuario;
-    $_SESSION['id'] = $usuario['id'];
+function startSession($usuario){
+    $_SESSION['id']   = $usuario['id'];
     $_SESSION['nome'] = $usuario['nome'];
-    header("Location: startSession.php");
+    echo json_encode(["success" => true]);
+    exit;
+}
+
+function returnError($message){
+    echo json_encode(["success" => false, "message" => $message]);
     exit;
 }
 ?>
@@ -98,6 +79,9 @@ function startSession(){
         </div>
         <div id="buttonElinkCreateAccount">
             <button type="submit" id="btnSend">Enviar</button>
+        </div>
+        <div id="message">
+            <p id="messageP"></p>
         </div>
     </form>
     <section>
